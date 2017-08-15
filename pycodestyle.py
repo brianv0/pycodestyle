@@ -80,7 +80,7 @@ except ImportError:
 __version__ = '2.3.1'
 
 DEFAULT_EXCLUDE = '.svn,CVS,.bzr,.hg,.git,__pycache__,.tox'
-DEFAULT_IGNORE = 'E121,E123,E126,E226,E24,E704,W503,W504'
+DEFAULT_IGNORE = 'E121,E123,E126,E226,E24,E704,W503'
 try:
     if sys.platform == 'win32':
         USER_CONFIG = os.path.expanduser(r'~\.pycodestyle')
@@ -1398,9 +1398,10 @@ def maximum_doc_length(logical_line, max_doc_length, noqa, tokens):
 
     Reports warning W504
     """
-    prev_token = None
-    if noqa:
+    if max_doc_length is None or noqa:
         return
+
+    prev_token = None
     for token_type, text, start, end, line in tokens:
         if token_type in (tokenize.STRING, tokenize.COMMENT):
             # Only check comment-only lines
@@ -1604,9 +1605,7 @@ class Checker(object):
         self._logical_checks = options.logical_checks
         self._ast_checks = options.ast_checks
         self.max_line_length = options.max_line_length
-        self.max_doc_length = options.max_line_length
-        if options.max_doc_length:
-            self.max_doc_length = options.max_doc_length
+        self.max_doc_length = options.max_doc_length
         self.multiline = False  # in a multiline string?
         self.hang_closing = options.hang_closing
         self.verbose = options.verbose
@@ -2211,8 +2210,8 @@ def get_parser(prog='pycodestyle', version=__version__):
                            "(default: %default)")
     parser.add_option('--max-doc-length', type='int', metavar='n',
                       default=None,
-                      help="set maximum allowed doc line length "
-                           "(default: %d)" % (MAX_LINE_LENGTH))
+                      help="set maximum allowed doc line length and perform "
+                           "these checks (unchecked if not set)")
     parser.add_option('--hang-closing', action='store_true',
                       help="hang closing bracket instead of matching "
                            "indentation of opening bracket's line")

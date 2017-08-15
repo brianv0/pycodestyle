@@ -157,7 +157,8 @@ Quick help is available on the command line::
     --count              print total number of errors and warnings to standard
                          error and set exit code to 1 if total is not null
     --max-line-length=n  set maximum allowed line length (default: 79)
-    --max-doc-length=n   set maximum allowed doc line length (default: 79)
+    --max-doc-length=n   set maximum allowed doc line length and perform these
+                         checks (unchecked if not set)
     --hang-closing       hang closing bracket instead of matching indentation of
                          opening bracket's line
     --format=format      set the error format [default|pylint|<custom>]
@@ -419,10 +420,11 @@ This is the current list of error and warning codes:
 
 
 **(*)** In the default configuration, the checks **E121**, **E123**, **E126**,
-**E133**, **E226**, **E241**, **E242**, **E704**, **W503**, **W504** are ignored
-because they are not rules unanimously accepted, and `PEP 8`_ does not enforce them.
-The check **E133** is mutually exclusive with check **E123**.  Use switch ``--hang-
-closing`` to report **E133** instead of **E123**.
+**E133**, **E226**, **E241**, **E242**, **E704** and **W503** are ignored because
+they are not rules unanimously accepted, and `PEP 8`_ does not enforce them.  The
+check **E133** is mutually exclusive with check **E123**.  Use switch ``--hang-
+closing`` to report **E133** instead of **E123**. Use switch ``--max-doc-length=
+n`` to report **W504**.
 
 **(^)** These checks can be disabled at the line level using the ``# noqa``
 special comment.  This possibility should be reserved for special cases.
