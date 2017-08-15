@@ -62,11 +62,11 @@ ddd = \
 #: E501 E225 E226
 very_long_identifiers=and_terrible_whitespace_habits(are_no_excuse+for_long_lines)
 #
-#: E501
+#: E501 W504
 '''multiline string
 with a long long long long long long long long long long long long long long long long line
 '''
-#: E501
+#: E501 W504
 '''same thing, but this time without a terminal newline in the string
 long long long long long long long long long long long long long long long long line'''
 #
@@ -79,10 +79,10 @@ that I'm calling:
 
     http://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx
 """
-#: E501
+#: E501 W504
 """
 longnospaceslongnospaceslongnospaceslongnospaceslongnospaceslongnospaceslongnospaceslongnospaces"""
-#: E501
+#: E501 W504
 # Regression test for #622
 def foo():
     """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis pulvinar vitae
@@ -92,12 +92,12 @@ def foo():
 This
                                                                        almost_empty_line
 """
-#: E501
+#: E501 W504
 """
 This
                                                                         almost_empty_line
 """
-#: E501
+#: E501 W504
 # A basic comment
 # with a long long long long long long long long long long long long long long long long line
 
@@ -118,6 +118,6 @@ import this
 #                                                                      almost_empty_line
 
 #
-#: E501
+#: E501 W504
 # This
 #                                                                       almost_empty_line

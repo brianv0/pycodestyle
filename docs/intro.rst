@@ -157,6 +157,7 @@ Quick help is available on the command line::
     --count              print total number of errors and warnings to standard
                          error and set exit code to 1 if total is not null
     --max-line-length=n  set maximum allowed line length (default: 79)
+    --max-doc-length=n   set maximum allowed doc line length (default: 79)
     --hang-closing       hang closing bracket instead of matching indentation of
                          opening bracket's line
     --format=format      set the error format [default|pylint|<custom>]
@@ -169,9 +170,9 @@ Quick help is available on the command line::
     Configuration:
       The project options are read from the [pycodestyle] section of the
       tox.ini file or the setup.cfg file located in any parent folder of the
-      path(s) being processed.  Allowed options are: exclude, filename, select,
-      ignore, max-line-length, hang-closing, count, format, quiet, show-pep8,
-      show-source, statistics, verbose.
+      path(s) being processed.  Allowed options are: exclude, filename,
+      select, ignore, max-line-length, max-doc-length, hang-closing, count,
+      format, quiet, show-pep8, show-source, statistics, verbose.
 
       --config=path      user config file location
       (default: ~/.config/pycodestyle)
@@ -402,6 +403,8 @@ This is the current list of error and warning codes:
 +------------+----------------------------------------------------------------------+
 | W503 (*)   | line break occurred before a binary operator                         |
 +------------+----------------------------------------------------------------------+
+| W504 (\*^) | doc line too long (82 > 79 characters)                               |
++------------+----------------------------------------------------------------------+
 +------------+----------------------------------------------------------------------+
 | **W6**     | *Deprecation warning*                                                |
 +------------+----------------------------------------------------------------------+
@@ -416,9 +419,9 @@ This is the current list of error and warning codes:
 
 
 **(*)** In the default configuration, the checks **E121**, **E123**, **E126**,
-**E133**, **E226**, **E241**, **E242**, **E704** and **W503** are ignored because
-they are not rules unanimously accepted, and `PEP 8`_ does not enforce them.  The
-check **E133** is mutually exclusive with check **E123**.  Use switch ``--hang-
+**E133**, **E226**, **E241**, **E242**, **E704**, **W503**, **W504** are ignored
+because they are not rules unanimously accepted, and `PEP 8`_ does not enforce them.
+The check **E133** is mutually exclusive with check **E123**.  Use switch ``--hang-
 closing`` to report **E133** instead of **E123**.
 
 **(^)** These checks can be disabled at the line level using the ``# noqa``

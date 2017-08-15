@@ -80,7 +80,7 @@ except ImportError:
 __version__ = '2.3.1'
 
 DEFAULT_EXCLUDE = '.svn,CVS,.bzr,.hg,.git,__pycache__,.tox'
-DEFAULT_IGNORE = 'E121,E123,E126,E226,E24,E704,W503'
+DEFAULT_IGNORE = 'E121,E123,E126,E226,E24,E704,W503,W504'
 try:
     if sys.platform == 'win32':
         USER_CONFIG = os.path.expanduser(r'~\.pycodestyle')
@@ -95,6 +95,7 @@ except ImportError:
 PROJECT_CONFIG = ('setup.cfg', 'tox.ini')
 TESTSUITE_PATH = os.path.join(os.path.dirname(__file__), 'testsuite')
 MAX_LINE_LENGTH = 79
+MAX_DOC_LENGTH = 72
 REPORT_FORMAT = {
     'default': '%(path)s:%(row)d:%(col)d: %(code)s %(text)s',
     'pylint': '%(path)s:%(row)d: [%(code)s] %(text)s',
@@ -1388,6 +1389,50 @@ def python_3000_backticks(logical_line):
         yield pos, "W604 backticks are deprecated, use 'repr()'"
 
 
+@register_check
+def maximum_doc_length(logical_line, max_doc_length, noqa, tokens):
+    r"""Limit all doc lines to a maximum of 72 characters.
+
+    For flowing long blocks of text (docstrings or comments), limiting the
+    length to 72 characters is recommended.
+
+    Reports warning W504
+    """
+    prev_token = None
+    if noqa:
+        return
+    for token_type, text, start, end, line in tokens:
+        if token_type in (tokenize.STRING, tokenize.COMMENT):
+            # Only check comment-only lines
+            if prev_token is None or prev_token in SKIP_TOKENS:
+                line_start = start[0]
+                lines = line.splitlines()
+                for line_num, physical_line in enumerate(lines):
+                    if hasattr(physical_line, 'decode'):  # Python 2
+                        # The line could contain multi-byte characters
+                        try:
+                            physical_line = physical_line.decode('utf-8')
+                        except UnicodeError:
+                            pass
+                    length = len(physical_line)
+                    chunks = physical_line.split()
+                    if token_type == tokenize.COMMENT:
+                        if (len(chunks) == 2 and
+                                length - len(chunks[-1]) < MAX_DOC_LENGTH):
+                            continue
+                    if len(chunks) == 1 and line_num + 1 < len(lines):
+                        if (len(chunks) == 1 and
+                                length - len(chunks[-1]) < MAX_DOC_LENGTH):
+                            continue
+                    if length > max_doc_length:
+                        doc_error = (line_start, max_doc_length)
+                        yield (doc_error, "W504 doc line too long "
+                                          "(%d > %d characters)"
+                               % (length, max_doc_length))
+                    line_start += 1
+        prev_token = token_type
+
+
 ##############################################################################
 # Helper functions
 ##############################################################################
@@ -1559,6 +1604,9 @@ class Checker(object):
         self._logical_checks = options.logical_checks
         self._ast_checks = options.ast_checks
         self.max_line_length = options.max_line_length
+        self.max_doc_length = options.max_line_length
+        if options.max_doc_length:
+            self.max_doc_length = options.max_doc_length
         self.multiline = False  # in a multiline string?
         self.hang_closing = options.hang_closing
         self.verbose = options.verbose
@@ -2124,8 +2172,8 @@ def get_parser(prog='pycodestyle', version=__version__):
                           usage="%prog [options] input ...")
     parser.config_options = [
         'exclude', 'filename', 'select', 'ignore', 'max-line-length',
-        'hang-closing', 'count', 'format', 'quiet', 'show-pep8',
-        'show-source', 'statistics', 'verbose']
+        'max-doc-length', 'hang-closing', 'count', 'format', 'quiet',
+        'show-pep8', 'show-source', 'statistics', 'verbose']
     parser.add_option('-v', '--verbose', default=0, action='count',
                       help="print status messages, or debug with -vv")
     parser.add_option('-q', '--quiet', default=0, action='count',
@@ -2161,6 +2209,10 @@ def get_parser(prog='pycodestyle', version=__version__):
                       default=MAX_LINE_LENGTH,
                       help="set maximum allowed line length "
                            "(default: %default)")
+    parser.add_option('--max-doc-length', type='int', metavar='n',
+                      default=None,
+                      help="set maximum allowed doc line length "
+                           "(default: %d)" % (MAX_LINE_LENGTH))
     parser.add_option('--hang-closing', action='store_true',
                       help="hang closing bracket instead of matching "
                            "indentation of opening bracket's line")
