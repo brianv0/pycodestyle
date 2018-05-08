@@ -345,7 +345,7 @@ def blank_lines(logical_line, blank_lines, indent_level, line_number,
     E304: @decorator\n\ndef a():\n    pass
     E305: def a():\n    pass\na()
     E306: def a():\n    def b():\n        pass\n    def c():\n        pass
-    """ # noqa
+    """  # noqa
     top_level_lines = BLANK_LINES_CONFIG['top_level']
     method_lines = BLANK_LINES_CONFIG['method']
 
@@ -1191,8 +1191,8 @@ def _is_binary_operator(token_type, text):
     is_op_token = token_type == tokenize.OP
     is_conjunction = text in ['and', 'or']
     # NOTE(sigmavirus24): Previously the not_a_symbol check was executed
-    # conditionally. Since it is now *always* executed, text may be None.
-    # In that case we get a TypeError for `text not in str`.
+    # conditionally. Since it is now *always* executed, text may be
+    # None. In that case we get a TypeError for `text not in str`.
     not_a_symbol = text and text not in "()[]{},:.;@=%~"
     # The % character is strictly speaking a binary operator, but the
     # common usage seems to be to put it next to the format parameters,
@@ -1548,15 +1548,16 @@ def python_3000_invalid_escape_sequence(logical_line, tokens):
 
 @register_check
 def python_3000_async_await_keywords(logical_line, tokens):
-    """'async' and 'await' are reserved keywords starting with Python 3.7
+    """'async' and 'await' are reserved keywords starting at Python 3.7.
 
     W606: async = 42
     W606: await = 42
-    Okay: async def read_data(db):\n    data = await db.fetch('SELECT ...')
-    """
-    # The Python tokenize library before Python 3.5 recognizes async/await as a
-    # NAME token. Therefore, use a state machine to look for the possible
-    # async/await constructs as defined by the Python grammar:
+    Okay: async def read(db):\n    data = await db.fetch('SELECT ...')
+    """  # noqa
+    # The Python tokenize library before Python 3.5 recognizes
+    # async/await as a NAME token. Therefore, use a state machine to
+    # look for the possible async/await constructs as defined by the
+    # Python grammar:
     # https://docs.python.org/3/reference/grammar.html
 
     state = None
@@ -1571,14 +1572,15 @@ def python_3000_async_await_keywords(logical_line, tokens):
                     state = ('await', start)
         elif state[0] == 'async_stmt':
             if token_type == tokenize.NAME and text in ('def', 'with', 'for'):
-                # One of funcdef, with_stmt, or for_stmt. Return to looking
-                # for async/await names.
+                # One of funcdef, with_stmt, or for_stmt. Return to
+                # looking for async/await names.
                 state = None
             else:
                 error = True
         elif state[0] == 'await':
             if token_type in (tokenize.NAME, tokenize.NUMBER, tokenize.STRING):
-                # An await expression. Return to looking for async/await names.
+                # An await expression. Return to looking for async/await
+                # names.
                 state = None
             else:
                 error = True
@@ -1600,7 +1602,7 @@ def python_3000_async_await_keywords(logical_line, tokens):
         )
 
 
-##############################################################################
+########################################################################
 @register_check
 def maximum_doc_length(logical_line, max_doc_length, noqa, tokens):
     r"""Limit all doc lines to a maximum of 72 characters.
@@ -1635,6 +1637,8 @@ def maximum_doc_length(logical_line, max_doc_length, noqa, tokens):
                             physical_line = physical_line.decode('utf-8')
                         except UnicodeError:
                             pass
+                    if start[0] + line_num == 1 and line.startswith('#!'):
+                        return
                     length = len(physical_line)
                     chunks = physical_line.split()
                     if token_type == tokenize.COMMENT:
@@ -1752,8 +1756,8 @@ def parse_udiff(diff, patterns=None, parent='.'):
             rv[path].update(range(row, row + nrows))
         elif line[:3] == '+++':
             path = line[4:].split('\t', 1)[0]
-            # Git diff will use (i)ndex, (w)ork tree, (c)ommit and (o)bject
-            # instead of a/b/c/d as prefixes for patches
+            # Git diff will use (i)ndex, (w)ork tree, (c)ommit and
+            # (o)bject instead of a/b/c/d as prefixes for patches
             if path[:2] in ('b/', 'w/', 'i/'):
                 path = path[2:]
             rv[path] = set()
