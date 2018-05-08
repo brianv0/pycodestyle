@@ -122,3 +122,7 @@ import this
 #: E501 W505
 # This
 #                                                                       almost_empty_line
+
+#
+#: Okay
+#!/reallylongpath/toexecutable --maybe --with --some ARGUMENTS TO DO WITH WHAT EXECUTABLE TO RUN

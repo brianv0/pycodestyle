@@ -78,10 +78,10 @@ try:
 except ImportError:
     from ConfigParser import RawConfigParser
 
-__version__ = '2.3.1'
+__version__ = '2.4.0'
 
 DEFAULT_EXCLUDE = '.svn,CVS,.bzr,.hg,.git,__pycache__,.tox'
-DEFAULT_IGNORE = 'E121,E123,E126,E226,E24,E704,W503'
+DEFAULT_IGNORE = 'E121,E123,E126,E226,E24,E704,W503,W504'
 try:
     if sys.platform == 'win32':
         USER_CONFIG = os.path.expanduser(r'~\.pycodestyle')
@@ -96,6 +96,13 @@ except ImportError:
 PROJECT_CONFIG = ('setup.cfg', 'tox.ini')
 TESTSUITE_PATH = os.path.join(os.path.dirname(__file__), 'testsuite')
 MAX_LINE_LENGTH = 79
+# Number of blank lines between various code parts.
+BLANK_LINES_CONFIG = {
+    # Top level class and function.
+    'top_level': 2,
+    # Methods and nested class and function.
+    'method': 1,
+}
 MAX_DOC_LENGTH = 72
 REPORT_FORMAT = {
     'default': '%(path)s:%(row)d:%(col)d: %(code)s %(text)s',
@@ -104,7 +111,7 @@ REPORT_FORMAT = {
 
 PyCF_ONLY_AST = 1024
 SINGLETONS = frozenset(['False', 'None', 'True'])
-KEYWORDS = frozenset(keyword.kwlist + ['print']) - SINGLETONS
+KEYWORDS = frozenset(keyword.kwlist + ['print', 'async']) - SINGLETONS
 UNARY_OPERATORS = frozenset(['>>', '**', '*', '+', '-'])
 ARITHMETIC_OP = frozenset(['**', '*', '/', '//', '+', '-'])
 WS_OPTIONAL_OPERATORS = ARITHMETIC_OP.union(['^', '&', '|', '<<', '>>', '%'])
@@ -123,7 +130,7 @@ RAISE_COMMA_REGEX = re.compile(r'raise\s+\w+\s*,')
 RERAISE_COMMA_REGEX = re.compile(r'raise\s+\w+\s*,.*,\s*\w+\s*$')
 ERRORCODE_REGEX = re.compile(r'\b[A-Z]\d{3}\b')
 DOCSTRING_REGEX = re.compile(r'u?r?["\']')
-EXTRANEOUS_WHITESPACE_REGEX = re.compile(r'[[({] | []}),;:]')
+EXTRANEOUS_WHITESPACE_REGEX = re.compile(r'[\[({] | [\]}),;:]')
 WHITESPACE_AFTER_COMMA_REGEX = re.compile(r'[,;:]\s*(?:  |\t)')
 COMPARE_SINGLETON_REGEX = re.compile(r'(\bNone|\bFalse|\bTrue)?\s*([=!]=)'
                                      r'\s*(?(1)|(None|False|True))\b')
@@ -263,7 +270,8 @@ def trailing_blank_lines(physical_line, lines, line_number, total_lines):
 
 
 @register_check
-def maximum_line_length(physical_line, max_line_length, multiline, noqa):
+def maximum_line_length(physical_line, max_line_length, multiline,
+                        line_number, noqa):
     r"""Limit all lines to a maximum of 79 characters.
 
     There are still many devices around that are limited to 80 character
@@ -278,6 +286,9 @@ def maximum_line_length(physical_line, max_line_length, multiline, noqa):
     line = physical_line.rstrip()
     length = len(line)
     if length > max_line_length and not noqa:
+        # Special case: ignore long shebang lines.
+        if line_number == 1 and line.startswith('#!'):
+            return
         # Special case for long URLs in multi-line docstrings or
         # comments, but still report the error when the 72 first chars
         # are whitespaces.
@@ -334,39 +345,52 @@ def blank_lines(logical_line, blank_lines, indent_level, line_number,
     E304: @decorator\n\ndef a():\n    pass
     E305: def a():\n    pass\na()
     E306: def a():\n    def b():\n        pass\n    def c():\n        pass
-    """  # noqa
-    if line_number < 3 and not previous_logical:
+    """ # noqa
+    top_level_lines = BLANK_LINES_CONFIG['top_level']
+    method_lines = BLANK_LINES_CONFIG['method']
+
+    if line_number < top_level_lines + 1 and not previous_logical:
         return  # Don't expect blank lines before the first line
     if previous_logical.startswith('@'):
         if blank_lines:
             yield 0, "E304 blank lines found after function decorator"
-    elif blank_lines > 2 or (indent_level and blank_lines == 2):
+    elif (blank_lines > top_level_lines or
+            (indent_level and blank_lines == method_lines + 1)
+          ):
         yield 0, "E303 too many blank lines (%d)" % blank_lines
     elif STARTSWITH_TOP_LEVEL_REGEX.match(logical_line):
         if indent_level:
-            if not (blank_before or previous_indent_level < indent_level or
-                    DOCSTRING_REGEX.match(previous_logical)):
+            if not (blank_before == method_lines or
+                    previous_indent_level < indent_level or
+                    DOCSTRING_REGEX.match(previous_logical)
+                    ):
                 ancestor_level = indent_level
                 nested = False
                 # Search backwards for a def ancestor or tree root
                 # (top level).
-                for line in lines[line_number - 2::-1]:
+                for line in lines[line_number - top_level_lines::-1]:
                     if line.strip() and expand_indent(line) < ancestor_level:
                         ancestor_level = expand_indent(line)
                         nested = line.lstrip().startswith('def ')
                         if nested or ancestor_level == 0:
                             break
                 if nested:
-                    yield 0, "E306 expected 1 blank line before a " \
-                        "nested definition, found 0"
+                    yield 0, "E306 expected %s blank line before a " \
+                        "nested definition, found 0" % (method_lines,)
                 else:
-                    yield 0, "E301 expected 1 blank line, found 0"
-        elif blank_before != 2:
-            yield 0, "E302 expected 2 blank lines, found %d" % blank_before
-    elif (logical_line and not indent_level and blank_before != 2 and
-          previous_unindented_logical_line.startswith(('def ', 'class '))):
-        yield 0, "E305 expected 2 blank lines after " \
-            "class or function definition, found %d" % blank_before
+                    yield 0, "E301 expected %s blank line, found 0" % (
+                        method_lines,)
+        elif blank_before != top_level_lines:
+            yield 0, "E302 expected %s blank lines, found %d" % (
+                top_level_lines, blank_before)
+    elif (logical_line and
+            not indent_level and
+            blank_before != top_level_lines and
+            previous_unindented_logical_line.startswith(('def ', 'class '))
+          ):
+        yield 0, "E305 expected %s blank lines after " \
+            "class or function definition, found %d" % (
+                top_level_lines, blank_before)
 
 
 @register_check
@@ -879,7 +903,8 @@ def whitespace_around_named_parameter_equals(logical_line, tokens):
     r"""Don't use spaces around the '=' sign in function arguments.
 
     Don't use spaces around the '=' sign when used to indicate a
-    keyword argument or a default parameter value.
+    keyword argument or a default parameter value, except when
+    using a type annotation.
 
     Okay: def complex(real, imag=0.0):
     Okay: return magic(r=real, i=imag)
@@ -892,13 +917,18 @@ def whitespace_around_named_parameter_equals(logical_line, tokens):
 
     E251: def complex(real, imag = 0.0):
     E251: return magic(r = real, i = imag)
+    E252: def complex(real, image: float=0.0):
     """
     parens = 0
     no_space = False
+    require_space = False
     prev_end = None
     annotated_func_arg = False
     in_def = bool(STARTSWITH_DEF_REGEX.match(logical_line))
+
     message = "E251 unexpected spaces around keyword / parameter equals"
+    missing_message = "E252 missing whitespace around parameter equals"
+
     for token_type, text, start, end, line in tokens:
         if token_type == tokenize.NL:
             continue
@@ -906,6 +936,10 @@ def whitespace_around_named_parameter_equals(logical_line, tokens):
             no_space = False
             if start != prev_end:
                 yield (prev_end, message)
+        if require_space:
+            require_space = False
+            if start == prev_end:
+                yield (prev_end, missing_message)
         if token_type == tokenize.OP:
             if text in '([':
                 parens += 1
@@ -913,12 +947,17 @@ def whitespace_around_named_parameter_equals(logical_line, tokens):
                 parens -= 1
             elif in_def and text == ':' and parens == 1:
                 annotated_func_arg = True
-            elif parens and text == ',' and parens == 1:
+            elif parens == 1 and text == ',':
                 annotated_func_arg = False
-            elif parens and text == '=' and not annotated_func_arg:
-                no_space = True
-                if start != prev_end:
-                    yield (prev_end, message)
+            elif parens and text == '=':
+                if annotated_func_arg and parens == 1:
+                    require_space = True
+                    if start == prev_end:
+                        yield (prev_end, missing_message)
+                else:
+                    no_space = True
+                    if start != prev_end:
+                        yield (prev_end, message)
             if not parens:
                 annotated_func_arg = False
 
@@ -1148,34 +1187,26 @@ def explicit_line_join(logical_line, tokens):
                 parens -= 1
 
 
-@register_check
-def break_around_binary_operator(logical_line, tokens):
-    r"""
-    Avoid breaks before binary operators.
+def _is_binary_operator(token_type, text):
+    is_op_token = token_type == tokenize.OP
+    is_conjunction = text in ['and', 'or']
+    # NOTE(sigmavirus24): Previously the not_a_symbol check was executed
+    # conditionally. Since it is now *always* executed, text may be None.
+    # In that case we get a TypeError for `text not in str`.
+    not_a_symbol = text and text not in "()[]{},:.;@=%~"
+    # The % character is strictly speaking a binary operator, but the
+    # common usage seems to be to put it next to the format parameters,
+    # after a line break.
+    return ((is_op_token or is_conjunction) and not_a_symbol)
 
-    The preferred place to break around a binary operator is after the
-    operator, not before it.
 
-    W503: (width == 0\n + height == 0)
-    W503: (width == 0\n and height == 0)
+def _break_around_binary_operators(tokens):
+    """Private function to reduce duplication.
 
-    Okay: (width == 0 +\n height == 0)
-    Okay: foo(\n    -x)
-    Okay: foo(x\n    [])
-    Okay: x = '''\n''' + ''
-    Okay: foo(x,\n    -y)
-    Okay: foo(x,  # comment\n    -y)
-    Okay: var = (1 &\n       ~2)
-    Okay: var = (1 /\n       -2)
-    Okay: var = (1 +\n       -1 +\n       -2)
+    This factors out the shared details between
+    :func:`break_before_binary_operator` and
+    :func:`break_after_binary_operator`.
     """
-    def is_binary_operator(token_type, text):
-        # The % character is strictly speaking a binary operator, but
-        # the common usage seems to be to put it next to the format
-        # parameters, after a line break.
-        return ((token_type == tokenize.OP or text in ['and', 'or']) and
-                text not in "()[]{},:.;@=%~")
-
     line_break = False
     unary_context = True
     # Previous non-newline token types and text
@@ -1187,15 +1218,76 @@ def break_around_binary_operator(logical_line, tokens):
         if ('\n' in text or '\r' in text) and token_type != tokenize.STRING:
             line_break = True
         else:
-            if (is_binary_operator(token_type, text) and line_break and
-                    not unary_context and
-                    not is_binary_operator(previous_token_type,
-                                           previous_text)):
-                yield start, "W503 line break before binary operator"
+            yield (token_type, text, previous_token_type, previous_text,
+                   line_break, unary_context, start)
             unary_context = text in '([{,;'
             line_break = False
             previous_token_type = token_type
             previous_text = text
+
+
+@register_check
+def break_before_binary_operator(logical_line, tokens):
+    r"""
+    Avoid breaks before binary operators.
+
+    The preferred place to break around a binary operator is after the
+    operator, not before it.
+
+    W503: (width == 0\n + height == 0)
+    W503: (width == 0\n and height == 0)
+    W503: var = (1\n       & ~2)
+    W503: var = (1\n       / -2)
+    W503: var = (1\n       + -1\n       + -2)
+
+    Okay: foo(\n    -x)
+    Okay: foo(x\n    [])
+    Okay: x = '''\n''' + ''
+    Okay: foo(x,\n    -y)
+    Okay: foo(x,  # comment\n    -y)
+    """
+    for context in _break_around_binary_operators(tokens):
+        (token_type, text, previous_token_type, previous_text,
+         line_break, unary_context, start) = context
+        if (_is_binary_operator(token_type, text) and line_break and
+                not unary_context and
+                not _is_binary_operator(previous_token_type,
+                                        previous_text)):
+            yield start, "W503 line break before binary operator"
+
+
+@register_check
+def break_after_binary_operator(logical_line, tokens):
+    r"""
+    Avoid breaks after binary operators.
+
+    The preferred place to break around a binary operator is before the
+    operator, not after it.
+
+    W504: (width == 0 +\n height == 0)
+    W504: (width == 0 and\n height == 0)
+    W504: var = (1 &\n       ~2)
+
+    Okay: foo(\n    -x)
+    Okay: foo(x\n    [])
+    Okay: x = '''\n''' + ''
+    Okay: x = '' + '''\n'''
+    Okay: foo(x,\n    -y)
+    Okay: foo(x,  # comment\n    -y)
+
+    The following should be W504 but unary_context is tricky with these
+    Okay: var = (1 /\n       -2)
+    Okay: var = (1 +\n       -1 +\n       -2)
+    """
+    for context in _break_around_binary_operators(tokens):
+        (token_type, text, previous_token_type, previous_text,
+         line_break, unary_context, start) = context
+        if (_is_binary_operator(previous_token_type, previous_text) and
+                line_break and
+                not unary_context and
+                not _is_binary_operator(token_type, text)):
+            error_pos = (start[0] - 1, start[1])
+            yield error_pos, "W504 line break after binary operator"
 
 
 @register_check
@@ -1447,13 +1539,68 @@ def python_3000_invalid_escape_sequence(logical_line, tokens):
                     pos += 1
                     if string[pos] not in valid:
                         yield (
-                            pos,
+                            line.lstrip().find(text),
                             "W605 invalid escape sequence '\\%s'" %
                             string[pos],
                         )
                     pos = string.find('\\', pos + 1)
 
 
+@register_check
+def python_3000_async_await_keywords(logical_line, tokens):
+    """'async' and 'await' are reserved keywords starting with Python 3.7
+
+    W606: async = 42
+    W606: await = 42
+    Okay: async def read_data(db):\n    data = await db.fetch('SELECT ...')
+    """
+    # The Python tokenize library before Python 3.5 recognizes async/await as a
+    # NAME token. Therefore, use a state machine to look for the possible
+    # async/await constructs as defined by the Python grammar:
+    # https://docs.python.org/3/reference/grammar.html
+
+    state = None
+    for token_type, text, start, end, line in tokens:
+        error = False
+
+        if state is None:
+            if token_type == tokenize.NAME:
+                if text == 'async':
+                    state = ('async_stmt', start)
+                elif text == 'await':
+                    state = ('await', start)
+        elif state[0] == 'async_stmt':
+            if token_type == tokenize.NAME and text in ('def', 'with', 'for'):
+                # One of funcdef, with_stmt, or for_stmt. Return to looking
+                # for async/await names.
+                state = None
+            else:
+                error = True
+        elif state[0] == 'await':
+            if token_type in (tokenize.NAME, tokenize.NUMBER, tokenize.STRING):
+                # An await expression. Return to looking for async/await names.
+                state = None
+            else:
+                error = True
+
+        if error:
+            yield (
+                state[1],
+                "W606 'async' and 'await' are reserved keywords starting with "
+                "Python 3.7",
+            )
+            state = None
+
+    # Last token
+    if state is not None:
+        yield (
+            state[1],
+            "W606 'async' and 'await' are reserved keywords starting with "
+            "Python 3.7",
+        )
+
+
+##############################################################################
 @register_check
 def maximum_doc_length(logical_line, max_doc_length, noqa, tokens):
     r"""Limit all doc lines to a maximum of 72 characters.
@@ -1605,12 +1752,14 @@ def parse_udiff(diff, patterns=None, parent='.'):
             rv[path].update(range(row, row + nrows))
         elif line[:3] == '+++':
             path = line[4:].split('\t', 1)[0]
-            if path[:2] == 'b/':
+            # Git diff will use (i)ndex, (w)ork tree, (c)ommit and (o)bject
+            # instead of a/b/c/d as prefixes for patches
+            if path[:2] in ('b/', 'w/', 'i/'):
                 path = path[2:]
             rv[path] = set()
-    return dict([(os.path.join(parent, path), rows)
-                 for (path, rows) in rv.items()
-                 if rows and filename_match(path, patterns)])
+    return dict([(os.path.join(parent, filepath), rows)
+                 for (filepath, rows) in rv.items()
+                 if rows and filename_match(filepath, patterns)])
 
 
 def normalize_paths(value, parent=os.curdir):
